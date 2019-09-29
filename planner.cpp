@@ -61,7 +61,8 @@ static void planner(
     int target_y = targetposeY - 1;
 
     static Dijkstra dijkstra;
-    static std::vector<std::pair<int, int>> best_path;
+    static Dijkstra::Path best_path;
+    // static std::vector<std::pair<int, int>> best_path;
 
     if (!dijkstra.isInitialized()) {
         // run this for once only, in the very beginning
@@ -78,13 +79,13 @@ static void planner(
 
         // load the targe trajectory
         std::vector<std::pair<int, int>> target_trajectory;
-        mexPrintf("Target steps: %d\n", target_steps);
+        // mexPrintf("Target steps: %d\n", target_steps);
         for (int i=0; i<target_steps; ++i) {
             int x = (int) target_traj[i] - 1;
             int y = (int) target_traj[i + target_steps] - 1;
             target_trajectory.push_back(std::make_pair(x, y));
         }
-        mexPrintf("Trajectory size: %d\n", target_trajectory.size());
+        // mexPrintf("Trajectory size: %d\n", target_trajectory.size());
 
         dijkstra.initTargetTrajectory(target_trajectory);
         mexPrintf("Target trajectory size: %d\n", dijkstra.target_trajectory.size());
@@ -95,23 +96,82 @@ static void planner(
 
         dijkstra.search();
 
-        mexPrintf("Evaluated path size: %d\n", dijkstra.evaluated_paths.size());
-        best_path = dijkstra.evaluated_paths.begin()->second.path;
+        // mexPrintf("Evaluated path size: %d\n", dijkstra.evaluated_paths.size());
+
+        best_path = dijkstra.evaluated_paths.begin()->second;
+        // for (const auto& p : best_path.trajectory) {
+        //     mexPrintf("Coordinate: %d, %d\n", p.first, p.second);
+        // }
+        mexPrintf("Path cost: %d\n", best_path.cost); 
+        mexPrintf("Waiting time: %d\n", best_path.wait_time);
+        // mexPrintf("Index: %d\n", best_path.least_cost_index); 
+        mexPrintf("Waiting point: (%d, %d)\n", best_path.least_cost_coordinate.first, best_path.least_cost_coordinate.second); 
+
+        mexPrintf("Starting point cost: %d\n", dijkstra.map[robot_x][robot_y]);
+        mexPrintf("Waiting point cost: %d\n", dijkstra.map[best_path.least_cost_coordinate.first][best_path.least_cost_coordinate.second]);
+        // mexPrintf("Least cost: %d\n", dijkstra.map[709][574]);
+        // mexPrintf("Least cost: %d\n", dijkstra.map[693][575]); 
+        // auto pair = std::make_pair(709, 574);
+        // mexPrintf("Target arrival time: %d\n", dijkstra.target_trajectory.find(pair)->second);
     }
 
-    static int counter = 0;
-    int next_x, next_y;
+    auto best_trajectory = best_path.trajectory;
 
-    int path_size = best_path.size();
-    // mexPrintf("Best path size: %d\n", path_size);
-    if (counter >= path_size) {
-        next_x = best_path[0].first;
-        next_y = best_path[0].second;
-    } else {
-        next_x = best_path[path_size - counter - 1].first;
-        next_y = best_path[path_size - counter - 1].second;
+    // mexPrintf("Current time: %d\n", curr_time);
+    static int counter = 0;
+    int initial_plan_time = 0;
+    if (curr_time - counter > 1) {
+        initial_plan_time = curr_time - counter;
+    }
+
+    static bool already_trimmed = false;
+
+    if (initial_plan_time > 0 && !already_trimmed) {
+        mexPrintf("Initial planning time: %d\n", initial_plan_time);
+        auto itr = dijkstra.evaluated_paths.begin();
+        while (itr->second.wait_time <= initial_plan_time) {
+            itr++;
+            mexPrintf("Path changed\n");
+        }
+        best_path = itr->second;
+        // for (const auto& p : best_path.trajectory) {
+        //     mexPrintf("Coordinate: %d, %d\n", p.first, p.second);
+        // }
+        mexPrintf("Initial planning takes too long, shrinking waiting time and trimming path...\n"
+
+        mexPrintf("Path size before trimming: %d\n", best_path.trajectory.size());
+        int trimmed_time = initial_plan_time;
+        if (best_path.wait_time >= initial_plan_time) {
+            best_path.trajectory.erase(best_path.trajectory.begin() + best_path.least_cost_index, best_path.trajectory.begin() + best_path.least_cost_index + trimmed_time);
+        }
+        // for (const auto& p : best_path.trajectory) {
+        //     mexPrintf("Coordinate: %d, %d\n", p.first, p.second);
+        // }
+        mexPrintf("Path size after trimming: %d\n", best_path.trajectory.size());
+
+        best_trajectory = best_path.trajectory;
+        already_trimmed = true;
     }
     
+
+    int next_x, next_y;
+
+    int path_size = best_trajectory.size();
+
+    // mexPrintf("Best path size: %d\n", path_size);
+    // if (counter >= path_size) {
+    //     next_x = best_path[0].first;
+    //     next_y = best_path[0].second;
+    // } else {
+    //     next_x = best_path[path_size - counter - 1].first;
+    //     next_y = best_path[path_size - counter - 1].second;
+    // }
+    int i = std::max(0, path_size - counter - 1);
+
+    next_x = best_trajectory[i].first;
+    next_y = best_trajectory[i].second;
+    // mexPrintf("Coordinate: %d, %d\n", next_x, next_y);
+    // mexPrintf("Coordinate: %d, %d\n", best_path[0].first, best_path[0].second);
     counter++;
 
     // convert to 1-indexed

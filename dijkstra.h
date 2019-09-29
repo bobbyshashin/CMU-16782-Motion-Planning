@@ -16,9 +16,13 @@ class Dijkstra {
     };
 
     struct Path {
-        std::vector<std::pair<int, int>> path;
+        std::vector<std::pair<int, int>> trajectory;
         int length;
         int cost;
+
+        int least_cost_index;
+        std::pair<int, int> least_cost_coordinate;
+        int wait_time;
     };
 
     struct compareCost {
@@ -51,6 +55,7 @@ class Dijkstra {
     Cell extractFromOpenList();
 
     Path findPath(int x, int y);
+    void optimizePath(Path& path);
 
     int start_x, start_y;
 

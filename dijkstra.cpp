@@ -91,7 +91,13 @@ Dijkstra::Path Dijkstra::findPath(int x0, int y0) {
     int y = y0;
 
     path.cost = closed_list.at(std::make_pair(x, y)).cost;
-    path.path.push_back(std::make_pair(x, y));
+    path.least_cost_coordinate = std::make_pair(x, y);
+
+    int index = 0;
+    path.least_cost_index = index;
+    int least_cost = map[x][y];
+
+    path.trajectory.push_back(std::make_pair(x, y));
 
     while (x != start_x || y != start_y) {
         if (!isInClosedList(x, y)) {
@@ -107,11 +113,24 @@ Dijkstra::Path Dijkstra::findPath(int x0, int y0) {
         x = px;
         y = py;
 
-        path.path.push_back(std::make_pair(x, y));
+        index++;
+        if (isValid(x, y)) {
+            if (map[x][y] < least_cost) {
+                path.least_cost_coordinate.first = x;
+                path.least_cost_coordinate.second = y;
+                least_cost = map[x][y];
+                path.least_cost_index = index;
+            }
+            path.trajectory.push_back(std::make_pair(x, y));
+        }
+        else {
+            // mexPrintf("Invalid! \n");
+        }
+    
     }
 
-    path.length = path.path.size();
-    // mexPrintf("path length %d\n", path.length);
+    path.length = path.trajectory.size();
+
     return path;
 }
 
@@ -131,19 +150,33 @@ void Dijkstra::generatePath() {
             continue;
         }
 
-        const auto& path = findPath(x, y);
+        auto path = findPath(x, y);
         if (path.cost == -1) {
             // invalid path, skip
             continue;
         }
         int wait_time = target_arrival_time - path.length;
         if (wait_time > 1) {
-            evaluated_paths.insert({path.cost + wait_time * map[x][y], path});
+            // find the cell with least cost on this trajectory (preferably closer to the last point on this trajectory)
+            // interpolate the path by inserting a "wait time"
+            // so we wait at the cell with least cost
+            // then when it's about time, start moving towards the goal
+            path.wait_time = wait_time;
+            optimizePath(path);
+            evaluated_paths.insert({path.cost + wait_time * map[path.least_cost_coordinate.first][path.least_cost_coordinate.second], path});
         }
 
     }
 
 }
+
+void Dijkstra::optimizePath(Path& path) {
+
+    auto coordinate = path.least_cost_coordinate;
+    auto itr = path.trajectory.insert(path.trajectory.begin() + path.least_cost_index, path.wait_time, coordinate);
+    // mexPrintf("Optimized path size: %d\n", path.trajectory.size());
+}
+
 
 void Dijkstra::search() {
 
