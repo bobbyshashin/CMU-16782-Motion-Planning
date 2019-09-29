@@ -6,7 +6,8 @@
 #include <math.h>
 #include <mex.h>
 
-#include "a_star.h"
+// #include "a_star.h"
+#include "dijkstra.h"
 
 /* Input Arguments */
 #define	MAP_IN                  prhs[0]
@@ -52,150 +53,66 @@ static void planner(
     // 8-connected grid
     int dX[NUMOFDIRS] = {-1, -1, -1,  0,  0,  1, 1, 1};
     int dY[NUMOFDIRS] = {-1,  0,  1, -1,  1, -1, 0, 1};
-    
-    // for now greedily move towards the final target position,
-    // but this is where you can put your planner
-    static AStarPlanner astar_planner;
-    static int counter = 0;
-    if (!astar_planner.isInitialized()) {
-        printf("Initialized.\n");
-        // load the map into planner (this will be done only once)
-        astar_planner.initMapSize(x_size, y_size);
-        astar_planner.initParam(collision_thresh);
 
-        for (int i=1; i<=x_size; ++i) {
-            for (int j=1; j<=y_size; ++j) {
-                int cost = map[GETMAPINDEX(i, j, x_size, y_size)];
-                astar_planner.initMapCell(i-1, j-1, cost);
-                // mexPrintf("Cost: %d \n", cost);
-            }
-        }
-    }
-    else {
-        // mexPrintf("%d \n", counter);
-        ++counter;
-    }
-
-    // run the planner for current start and goal
-    
     // note that the robotpose and targetpose here are 1-indexed
-    int next_x, next_y;
-    int distance_threshold = 50; // maybe change this parameter to map size dependent
     int robot_x = robotposeX - 1;
     int robot_y = robotposeY - 1;
     int target_x = targetposeX - 1;
     int target_y = targetposeY - 1;
-    astar_planner.init(robot_x, robot_y, target_x, target_y);
-    if (astar_planner.completed()) {
-        // mexPrintf("No! \n");
-    }
 
-    while (!astar_planner.completed()) {
-        // mexPrintf("Openlist %d \n", astar_planner.open_list.size());
-        auto coordinate_cell = astar_planner.getCoordinateCellPairWithSmallestF();
-        auto curr_coordinate = coordinate_cell.first;
-        auto curr_cell = coordinate_cell.second;
-        astar_planner.addCellToClosedList(curr_coordinate, curr_cell);
-        // mexPrintf("Size of closed list: %d \n", astar_planner.closed_list.size());
-        // check whether this is the goal cell?
-        int curr_x = curr_coordinate.first;
-        int curr_y = curr_coordinate.second;
+    static Dijkstra dijkstra;
+    static std::vector<std::pair<int, int>> best_path;
 
-        if (curr_x == target_x && curr_y == target_y) {
-            // goal found
-            mexPrintf("Goal found! \n");
-            auto next_coordinate = astar_planner.getNextAction(std::make_pair(target_x, target_y));
-            mexPrintf("Next action got! \n");
-            next_x = next_coordinate.first;
-            next_y = next_coordinate.second;
-            break;
-        }
+    if (!dijkstra.isInitialized()) {
+        // run this for once only, in the very beginning
 
-        // terminate if we searched too much
-        if (abs(robot_x - curr_x) + abs(robot_y - curr_y) >= distance_threshold) {
-            mexPrintf("Out of bound! \n");
-            mexPrintf("Open list size: %d \n", astar_planner.open_list.size());
-            auto next_coordinate = astar_planner.getNextAction(std::make_pair(curr_x, curr_y));
-            mexPrintf("Next action got! \n");
-            next_x = next_coordinate.first;
-            next_y = next_coordinate.second;
-            break;
-        }
-
-        // expand the surrounding cells (8-connected grid)
-        for (int i=0; i<NUMOFDIRS; ++i) {
-            int new_x = curr_x + dX[i];
-            int new_y = curr_y + dY[i];
-
-            const auto new_coordinate = std::make_pair(new_x, new_y);
-            if (astar_planner.isValidCoordinate(new_coordinate) && !astar_planner.isInClosedList(new_coordinate)) {
-
-                auto new_cell = astar_planner.constructCell(new_coordinate, curr_x, curr_y);
-                // mexPrintf("Cost: %d \n", new_cell.G);
-                // mexPrintf("Heuristic: %d \n", new_cell.H);
-
-                if (astar_planner.isInOpenList(new_coordinate)) {
-                    auto old_cell = astar_planner.getCellFromOpenList(new_coordinate);
-
-                    const bool lower_cost = new_cell.G < old_cell.G;
-                    if (lower_cost) {
-                        astar_planner.updateCell(new_coordinate, curr_coordinate.first, curr_coordinate.second, new_cell.G);
-                    }
-                }
-
-                else {
-                    astar_planner.addCellToOpenList(new_coordinate, new_cell);
-                    // mexPrintf("Add (%d, %d)! \n", new_coordinate.first, new_coordinate.second);
-                }
-                // check if this cell is already in open list
-                    // if yes, check for lower cost
-                        // if the new cost is lower, modify the previous cell in the open list:
-                            // update its g value
-                            // update the parent
-                            // update its f value
-                        // else continue
-                    // if not, add a new cell into the open list
-            }
-
-            else {
-
+        // load the map
+        mexPrintf("Num of cells: %d\n", x_size * y_size);
+        dijkstra.initMapSize(x_size, y_size);
+        for (int i=1; i<=x_size; ++i) {
+            for (int j=1; j<=y_size; ++j) {
+                int cost = (int) map[GETMAPINDEX(i, j, x_size, y_size)];
+                dijkstra.map[i-1][j-1] = cost;
             }
         }
+
+        // load the targe trajectory
+        std::vector<std::pair<int, int>> target_trajectory;
+        mexPrintf("Target steps: %d\n", target_steps);
+        for (int i=0; i<target_steps; ++i) {
+            int x = (int) target_traj[i] - 1;
+            int y = (int) target_traj[i + target_steps] - 1;
+            target_trajectory.push_back(std::make_pair(x, y));
+        }
+        mexPrintf("Trajectory size: %d\n", target_trajectory.size());
+
+        dijkstra.initTargetTrajectory(target_trajectory);
+        mexPrintf("Target trajectory size: %d\n", dijkstra.target_trajectory.size());
+        
+        mexPrintf("Planner is initialized.\n");
+
+        dijkstra.init(robot_x, robot_y, collision_thresh);
+
+        dijkstra.search();
+
+        mexPrintf("Evaluated path size: %d\n", dijkstra.evaluated_paths.size());
+        best_path = dijkstra.evaluated_paths.begin()->second.path;
     }
 
+    static int counter = 0;
+    int next_x, next_y;
 
-    // int goalposeX = (int) target_traj[target_steps-1];
-    // int goalposeY = (int) target_traj[target_steps-1+target_steps];
-    // // printf("robot: %d %d;\n", robotposeX, robotposeY);
-    // // printf("goal: %d %d;\n", goalposeX, goalposeY);
-    // // printf("current time: %d;\n", curr_time);
-
-    // int bestX = 0, bestY = 0; // robot will not move if greedy action leads to collision
-    // double olddisttotarget = (double)sqrt(((robotposeX-goalposeX)*(robotposeX-goalposeX) + (robotposeY-goalposeY)*(robotposeY-goalposeY)));
-    // double disttotarget;
-    // for(int dir = 0; dir < NUMOFDIRS; dir++)
-    // {
-    //     int newx = robotposeX + dX[dir];
-    //     int newy = robotposeY + dY[dir];
-
-    //     if (newx >= 1 && newx <= x_size && newy >= 1 && newy <= y_size)
-    //     {
-    //         if (((int)map[GETMAPINDEX(newx,newy,x_size,y_size)] >= 0) && ((int)map[GETMAPINDEX(newx,newy,x_size,y_size)] < collision_thresh))  //if free
-    //         {
-    //             disttotarget = (double)sqrt(((newx-goalposeX)*(newx-goalposeX) + (newy-goalposeY)*(newy-goalposeY)));
-    //             if(disttotarget < olddisttotarget)
-    //             {
-    //                 olddisttotarget = disttotarget;
-    //                 bestX = dX[dir];
-    //                 bestY = dY[dir];
-    //             }
-    //         }
-    //     }
-    // }
-    // robotposeX = robotposeX + bestX;
-    // robotposeY = robotposeY + bestY;
-    // action_ptr[0] = robotposeX;
-    // action_ptr[1] = robotposeY;
+    int path_size = best_path.size();
+    // mexPrintf("Best path size: %d\n", path_size);
+    if (counter >= path_size) {
+        next_x = best_path[0].first;
+        next_y = best_path[0].second;
+    } else {
+        next_x = best_path[path_size - counter - 1].first;
+        next_y = best_path[path_size - counter - 1].second;
+    }
+    
+    counter++;
 
     // convert to 1-indexed
     action_ptr[0] = next_x + 1;

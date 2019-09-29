@@ -1,0 +1,27 @@
+Map1:
+RESULT:
+	 target caught = 1
+	 time taken (s) = 5013
+	 moves made = 1528
+	 path cost = 2057938
+
+Map2:
+RESULT:
+	 target caught = 1
+	 time taken (s) = 5013
+	 moves made = 1528
+	 path cost = 2057938
+
+Map3:
+RESULT:
+	 target caught = 1
+	 time taken (s) = 247
+	 moves made = 243
+	 path cost = 247
+	 
+Map4:
+RESULT:
+	 target caught = 1
+	 time taken (s) = 380
+	 moves made = 266
+	 path cost = 380
