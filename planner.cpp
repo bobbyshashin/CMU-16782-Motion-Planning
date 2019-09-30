@@ -109,13 +109,9 @@ static void planner(
 
         mexPrintf("Starting point cost: %d\n", dijkstra.map[robot_x][robot_y]);
         mexPrintf("Waiting point cost: %d\n", dijkstra.map[best_path.least_cost_coordinate.first][best_path.least_cost_coordinate.second]);
-        // mexPrintf("Least cost: %d\n", dijkstra.map[709][574]);
-        // mexPrintf("Least cost: %d\n", dijkstra.map[693][575]); 
-        // auto pair = std::make_pair(709, 574);
+
         // mexPrintf("Target arrival time: %d\n", dijkstra.target_trajectory.find(pair)->second);
     }
-
-    auto best_trajectory = best_path.trajectory;
 
     // mexPrintf("Current time: %d\n", curr_time);
     static int counter = 0;
@@ -123,6 +119,8 @@ static void planner(
     if (curr_time - counter > 1) {
         initial_plan_time = curr_time - counter;
     }
+
+    auto best_trajectory = best_path.trajectory;
 
     static bool already_trimmed = false;
 
@@ -137,7 +135,7 @@ static void planner(
         // for (const auto& p : best_path.trajectory) {
         //     mexPrintf("Coordinate: %d, %d\n", p.first, p.second);
         // }
-        mexPrintf("Initial planning takes too long, shrinking waiting time and trimming path...\n"
+        mexPrintf("Initial planning takes too long, shrinking waiting time and trimming path...\n");
 
         mexPrintf("Path size before trimming: %d\n", best_path.trajectory.size());
         int trimmed_time = initial_plan_time;
@@ -158,14 +156,6 @@ static void planner(
 
     int path_size = best_trajectory.size();
 
-    // mexPrintf("Best path size: %d\n", path_size);
-    // if (counter >= path_size) {
-    //     next_x = best_path[0].first;
-    //     next_y = best_path[0].second;
-    // } else {
-    //     next_x = best_path[path_size - counter - 1].first;
-    //     next_y = best_path[path_size - counter - 1].second;
-    // }
     int i = std::max(0, path_size - counter - 1);
 
     next_x = best_trajectory[i].first;

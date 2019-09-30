@@ -52,7 +52,7 @@ bool Dijkstra::isValid(int x, int y) {
     return (x >= 0 && 
             y >= 0 &&
             x < map_size_x && 
-            y < map_size_y && 
+            y < map_size_y &&
             map[x][y] < collision_threshold);
 }
 
@@ -66,7 +66,7 @@ void Dijkstra::addToOpenList(const Cell cell) {
 }
 
 void Dijkstra::addToClosedList(const Cell cell) {
-    closed_list.insert({std::make_pair(cell.x, cell.y), cell});
+    // closed_list.insert({std::make_pair(cell.x, cell.y), cell});
     explored[cell.x][cell.y] = true;
     // set visited[cell.x][cell.y] = false; here?
 
@@ -90,7 +90,8 @@ Dijkstra::Path Dijkstra::findPath(int x0, int y0) {
     int x = x0;
     int y = y0;
 
-    path.cost = closed_list.at(std::make_pair(x, y)).cost;
+    // path.cost = closed_list.at(std::make_pair(x, y)).cost;
+    path.cost = cost_map[x][y];
     path.least_cost_coordinate = std::make_pair(x, y);
 
     int index = 0;
