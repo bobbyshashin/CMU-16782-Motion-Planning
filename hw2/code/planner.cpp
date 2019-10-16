@@ -5,6 +5,7 @@
  *=================================================================*/
 #include <math.h>
 #include "mex.h"
+#include "Planner.h"
 
 /* Input Arguments */
 #define	MAP_IN      prhs[0]
@@ -36,6 +37,7 @@
 
 //the length of each link in the arm (should be the same as the one used in runtest.m)
 #define LINKLENGTH_CELLS 10
+
 
 typedef struct {
   int X1, Y1;
@@ -220,6 +222,11 @@ static void planner(
 	*plan = NULL;
 	*planlength = 0;
     
+    // placeholder for now, unused
+    double* joint_limits;
+    Planner planner(numofDOFs, joint_limits, x_size, y_size, map, LINKLENGTH_CELLS, PI);
+
+
     //for now just do straight interpolation between start and goal checking for the validity of samples
 
     double distance = 0;
@@ -237,10 +244,14 @@ static void planner(
     int firstinvalidconf = 1;
     for (i = 0; i < numofsamples; i++){
         (*plan)[i] = (double*) malloc(numofDOFs*sizeof(double)); 
+        std::vector<double> angles;
         for(j = 0; j < numofDOFs; j++){
             (*plan)[i][j] = armstart_anglesV_rad[j] + ((double)(i)/(numofsamples-1))*(armgoal_anglesV_rad[j] - armstart_anglesV_rad[j]);
+            angles.push_back((*plan)[i][j]);
         }
-        if(!IsValidArmConfiguration((*plan)[i], numofDOFs, map, x_size, y_size) && firstinvalidconf)
+        
+        if(planner.IsValidArmConfiguration(angles) && firstinvalidconf)
+        // if(!IsValidArmConfiguration((*plan)[i], numofDOFs, map, x_size, y_size) && firstinvalidconf)
         {
             firstinvalidconf = 1;
             printf("ERROR: Invalid arm configuration!!!\n");
@@ -301,6 +312,11 @@ void mexFunction( int nlhs, mxArray *plhs[],
     //call the planner
     double** plan = NULL;
     int planlength = 0;
+    
+    // 0: RRT
+    // 1: RRT-Connect
+    // 2: RRT*
+    // 3: PRM
     
     //you can may be call the corresponding planner function here
     //if (planner_id == RRT)
