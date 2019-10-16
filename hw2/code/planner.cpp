@@ -5,7 +5,8 @@
  *=================================================================*/
 #include <math.h>
 #include "mex.h"
-#include "Planner.h"
+#include "RRT.h"
+// #include "PRM.h"
 
 /* Input Arguments */
 #define	MAP_IN      prhs[0]
@@ -39,6 +40,7 @@
 #define LINKLENGTH_CELLS 10
 
 static void planner(
+           int planner_id,
 		   double*	map,
 		   int x_size,
  		   int y_size,
@@ -54,8 +56,23 @@ static void planner(
     
     // placeholder for now, unused
     double* joint_limits;
-    Planner planner(numofDOFs, joint_limits, x_size, y_size, map, LINKLENGTH_CELLS, PI);
 
+    switch (planner_id) {
+        case RRT:
+            double eps = 1.0
+
+            RRT rrt(eps, numofDOFs, joint_limits, armstart_anglesV_rad, armgoal_anglesV_rad, x_size, y_size, map, LINKLENGTH_CELLS, PI);
+
+            break;
+        case RRTCONNECT:
+            break;
+        case RRTSTAR:
+            break;
+        case PRM:
+            break;
+        default:
+            break;
+    }
 
     //for now just do straight interpolation between start and goal checking for the validity of samples
 
@@ -154,7 +171,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
     //}
     
     //dummy planner which only computes interpolated path
-    planner(map,x_size,y_size, armstart_anglesV_rad, armgoal_anglesV_rad, numofDOFs, &plan, &planlength); 
+    planner(planner_id, map, x_size, y_size, armstart_anglesV_rad, armgoal_anglesV_rad, numofDOFs, &plan, &planlength); 
     
     printf("planner returned plan of length=%d\n", planlength); 
     
@@ -192,8 +209,3 @@ void mexFunction( int nlhs, mxArray *plhs[],
     return;
     
 }
-
-
-
-
-
