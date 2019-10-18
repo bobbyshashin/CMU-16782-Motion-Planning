@@ -107,3 +107,27 @@ bool Planner::IsValidArmConfiguration(const std::vector<double>& angles) const {
 
     return true;
 }
+
+bool Planner::chooseGoal() {
+    double sample = (double)rand() / (RAND_MAX);
+    return (sample <= goal_bias_weight);
+
+}
+
+std::vector<double> Planner::generateRandomSample() {
+    std::vector<double> config;
+    for (int i=0; i<DOF; ++i) {
+        // generate a random configuration from 0 to 2pi
+        double rand_config = (double)rand() / (RAND_MAX) * 2 * pi;
+        config.push_back(rand_config);
+    }
+    return config;
+}
+
+double Planner::euclideanDist(std::vector<double> config1, std::vector<double> config2) {
+    double distance = 0;
+    for (int i=0; i<DOF; ++i) {
+        distance += (config1[i] - config2[i]) * (config1[i] - config2[i]);
+    }
+    return sqrt(distance);
+}

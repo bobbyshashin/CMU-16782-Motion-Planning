@@ -1,4 +1,10 @@
+#ifndef PLANNER_H
+#define PLANNER_H
+
 #include <vector>
+#include <stdlib.h>
+#include <time.h> 
+#include <math.h>
 
 #define GETMAPINDEX(X, Y, XSIZE, YSIZE) (Y*XSIZE + X)
 
@@ -12,7 +18,8 @@ class Planner {
             int map_size_y, 
             double* map, 
             int link_length_cells, 
-            double pi) : DOF(DOF), map_size_x(map_size_x), map_size_y(map_size_y), link_length_cells(link_length_cells), pi(pi) {
+            double pi,
+            double goal_bias_weight) : DOF(DOF), map_size_x(map_size_x), map_size_y(map_size_y), link_length_cells(link_length_cells), pi(pi), goal_bias_weight(goal_bias_weight) {
 
                 // initialize the map
                 for (int i=0; i<map_size_x; ++i) {
@@ -29,6 +36,9 @@ class Planner {
                     this->start.push_back(start[k]);
                     this->goal.push_back(goal[k]);
                 }
+
+                // initialize the random number generator seed
+                srand(time(0));
                 
             }
     
@@ -43,10 +53,17 @@ class Planner {
     // Collision checkers
     bool IsValidArmConfiguration(const std::vector<double>& angles) const;
     bool IsValidLineSegment(double x0, double y0, double x1, double y1) const;
-
+    
+    std::vector<double> generateRandomSample();
+    bool chooseGoal();
+    double euclideanDist(std::vector<double> config1, std::vector<double> config2);
     // Degree of freedom
     int DOF;
 
     int link_length_cells;
     double pi;
+
+    double goal_bias_weight;
 };
+
+#endif
