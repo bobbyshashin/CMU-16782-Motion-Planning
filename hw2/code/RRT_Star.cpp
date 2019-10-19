@@ -113,11 +113,11 @@ void RRT_Star_Planner::rewire(const std::vector<double>& config) {
     int q_new_id = tree.size()-1;
     const auto& neighbours = getNeighboursId(config);
     double min_cost = costs[q_new_id];
-    int min_id = -1;
+    int min_id = q_new_id;
     for (const auto& n : neighbours) {
         if (isValidEdge(tree[n], config)) {
             double cost = costs[n] + euclideanDist(tree[n], config);
-            if (cost < min_cost) {
+            if (cost <= min_cost) {
                 min_cost = cost;
                 min_id = n;
             }
