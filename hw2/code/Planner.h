@@ -53,6 +53,8 @@ class Planner {
     // Collision checkers
     bool IsValidArmConfiguration(const std::vector<double>& angles) const;
     bool IsValidLineSegment(double x0, double y0, double x1, double y1) const;
+
+    bool isValidEdge(const std::vector<double>& config1, const std::vector<double>& config2, int interpolation_num = 100);
     
     std::vector<double> generateRandomSample();
     bool chooseGoal();

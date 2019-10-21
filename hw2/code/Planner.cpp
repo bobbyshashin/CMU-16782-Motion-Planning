@@ -108,6 +108,29 @@ bool Planner::IsValidArmConfiguration(const std::vector<double>& angles) const {
     return true;
 }
 
+bool Planner::isValidEdge(const std::vector<double>& config1, const std::vector<double>& config2, int interpolation_num) {
+    std::vector<double> direction;
+    for (int i=0; i<DOF; ++i) {
+        direction.push_back(config2[i] - config1[i]);
+    }
+
+    std::vector<double> inter(config1);
+    int n = 1;
+    // int interpolation_num = 100;
+    while (n <= interpolation_num) {
+        for (int i=0; i<DOF; ++i) {
+            inter[i] = config1[i] + ((double)n / (double)interpolation_num) * direction[i];
+        }
+        if (!IsValidArmConfiguration(inter)) {
+           return false;
+        }
+        ++n;
+    }
+    return true;
+
+}
+
+
 bool Planner::chooseGoal() {
     double sample = (double)rand() / (RAND_MAX);
     return (sample <= goal_bias_weight);

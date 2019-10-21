@@ -5,10 +5,10 @@
  *=================================================================*/
 #include <math.h>
 #include "mex.h"
-#include "RRT.h"
+#include "RRT_vector.h"
 #include "RRT_Connect.h"
 #include "RRT_Star.h"
-// #include "PRM.h"
+#include "PRM.h"
 
 /* Input Arguments */
 #define	MAP_IN      prhs[0]
@@ -59,11 +59,12 @@ static void planner(
     // placeholder for now, unused
     double* joint_limits;
 
-    int K = 10000;
+    int K = 20000;
     double eps = 0.5;
-    double reached_threshold = 0.3;
-    double goal_bias_weight = 0.05;
+    double reached_threshold = 0.5;
+    double goal_bias_weight = 0.1;
     double radius = 1.0;
+    int max_successors = 5;
     std::vector<std::vector<double>> path;
 
     if (planner_id == RRT) {
@@ -77,9 +78,14 @@ static void planner(
         RRT_Connect_Planner rrt_connect(K, eps, reached_threshold, numofDOFs, joint_limits, armstart_anglesV_rad, armgoal_anglesV_rad, x_size, y_size, map, LINKLENGTH_CELLS, PI, goal_bias_weight);
         rrt_connect.init();
         rrt_connect.growTree();
+
+        std::vector<std::vector<double>> orig_path;
         if (rrt_connect.goal_reached) {
-            path = rrt_connect.findPath();
+            orig_path = rrt_connect.findPath();
         }
+        mexPrintf("Path size: %d \n", orig_path.size());
+        path = rrt_connect.interpolatePath(orig_path);
+        mexPrintf("Interpolated path size: %d \n", path.size());
 
 
     } else if (planner_id == RRTSTAR) {
@@ -90,8 +96,9 @@ static void planner(
             path = rrt_star.findPath();
         }
     } else if (planner_id == PRM) {
-
-
+        PRM_Planner prm(K, max_successors, reached_threshold, radius, numofDOFs, joint_limits, armstart_anglesV_rad, armgoal_anglesV_rad, x_size, y_size, map, LINKLENGTH_CELLS, PI, goal_bias_weight);
+        prm.init();
+        prm.buildRoadmap();
     }
 
 

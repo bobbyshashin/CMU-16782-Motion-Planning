@@ -197,6 +197,34 @@ void RRT_Connect_Planner::addEdge(const int id1, const int id2, const int tree_i
 
 }
 
+std::vector<std::vector<double>> RRT_Connect_Planner::interpolatePath(std::vector<std::vector<double>>& path) {
+    std::vector<std::vector<double>> interpolated_path;
+    interpolated_path.push_back(path[0]);
+
+    for (int k=0; k<path.size()-1; ++k) {
+        std::vector<double> direction;
+        for (int i=0; i<DOF; ++i) {
+            direction.push_back(path[k+1][i] - path[k][i]);
+        }
+
+        std::vector<double> inter(path[k]);
+        int n = 1;
+        int interpolation_num = 5;
+        while (n <= interpolation_num) {
+            for (int i=0; i<DOF; ++i) {
+                inter[i] = path[k][i] + ((double)n / (double)interpolation_num) * direction[i];
+            }
+            ++n;
+            interpolated_path.push_back(inter);
+        }
+
+    }
+
+    return interpolated_path;
+    
+
+}
+
 std::vector<std::vector<double>> RRT_Connect_Planner::findPath() {
     int parent_id = connection_id2;
     std::vector<int> path2_with_ids;
@@ -223,6 +251,7 @@ std::vector<std::vector<double>> RRT_Connect_Planner::findPath() {
     std::vector<std::vector<double>> path;
     for (const auto& id : path1_with_ids) {
         path.push_back(tree1[id]);
+
     }
     for (const auto& id : path2_with_ids) {
         path.push_back(tree2[id]);

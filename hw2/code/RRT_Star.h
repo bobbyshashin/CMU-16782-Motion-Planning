@@ -39,7 +39,7 @@ class RRT_Star_Planner : public Planner {
     void addEdge(const int id1, const int id2);
     void updateCost(int id, double cost);
     
-    bool isValidEdge(const std::vector<double>& config1, const std::vector<double>& config2);
+    // bool isValidEdge(const std::vector<double>& config1, const std::vector<double>& config2);
 
     std::vector<std::vector<double>> findPath();
 
