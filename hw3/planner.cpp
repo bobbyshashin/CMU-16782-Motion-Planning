@@ -804,83 +804,6 @@ Env* create_env(char* filename)
     return env;
 }
 
-class State {
-
-public:
-    // Constructors
-    State() {}
-    State(const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>& cond) {
-        setConditions(cond);
-    }
-
-    // Setter function
-    void setConditions(const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>& cond) {
-        this->conditions = cond;
-    }
-
-    bool isValid() {
-        return this->valid;
-    }
-
-    State branch(const GroundedAction& action) {
-        // given an action, branch the next state from the current state
-        State new_state(conditions);
-        new_state.valid = action.meetPreconditions(conditions);
-        if (new_state.valid) {
-            cout << "valid" << endl << endl << endl << endl;
-            for (auto effect : action.getEffects()) {
-                if (!effect.get_truth()) {
-                    // cout << "erased" << effect << endl;
-                    effect.set_truth(true);
-                    new_state.conditions.erase(effect);
-                }
-                else {
-                    // cout << "inserted" << effect << endl;
-                    new_state.conditions.insert(effect);
-                }
-            }
-        }
-        return new_state;
-
-    }
-
-    // Members
-    unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> conditions;
-    bool valid;
-
-};
-
-
-class Node {
-public:
-    Node() {}
-    Node(const State& state, int cost, int heuristic, int id) : state(state), cost(cost), heuristic(heuristic), id(id) {}
-
-
-    State state;
-    int cost;
-    int heuristic;
-
-    int id;
-
-};
-
-int getHeuristic(const State& s, const State& goal) {
-    // number of unsatisfsied conditions in goal state
-    int h = goal.conditions.size();
-    for (const auto& c1 : goal.conditions) {
-        // for each condition in goal state, search for already satisfied ones in start state
-        for (const auto& c2 : s.conditions) {
-            if (c1 == c2) {
-                // a condition is satisfied
-                --h;
-                break;
-            }
-        }
-    }
-    return h;
-}
-
 using Args = list<string>;
 using ArgsPermutation = list<Args>;
 using AllArgsPermutation = vector<ArgsPermutation>;
@@ -1001,6 +924,86 @@ list<GroundedAction> generateAllGroundedActions(const unordered_set<Action, Acti
     return all_grounded_actions;
 }
 
+class State {
+
+public:
+    // Constructors
+    State() {}
+    State(const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>& cond) {
+        setConditions(cond);
+    }
+
+    // Setter function
+    void setConditions(const unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator>& cond) {
+        this->conditions = cond;
+    }
+
+    bool isValid() {
+        return this->valid;
+    }
+
+    State branch(const GroundedAction& action) {
+        // given an action, branch the next state from the current state
+        State new_state(conditions);
+        new_state.valid = action.meetPreconditions(conditions);
+        if (new_state.valid) {
+            // cout << "valid" << endl << endl << endl << endl;
+            for (auto effect : action.getEffects()) {
+                if (!effect.get_truth()) {
+                    // cout << "erased" << effect << endl;
+                    effect.set_truth(true);
+                    new_state.conditions.erase(effect);
+                }
+                else {
+                    // cout << "inserted" << effect << endl;
+                    new_state.conditions.insert(effect);
+                }
+            }
+        }
+        return new_state;
+
+    }
+
+    // Members
+    unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> conditions;
+    bool valid;
+
+};
+
+int getHeuristic(const State& s, const State& goal) {
+    // number of unsatisfsied conditions in goal state
+    int h = goal.conditions.size();
+    for (const auto& c1 : goal.conditions) {
+        // for each condition in goal state, search for already satisfied ones in start state
+        for (const auto& c2 : s.conditions) {
+            if (c1 == c2) {
+                // a condition is satisfied
+                --h;
+                break;
+            }
+        }
+    }
+    return h;
+}
+
+class Node {
+public:
+    Node() {}
+    Node(const State& state, int cost, int heuristic, int id) : state(state), cost(cost), heuristic(heuristic), id(id) {}
+
+
+    State state;
+    int cost;
+    int heuristic;
+
+    int id;
+
+};
+
+typedef std::pair<int, int> CostNodeId;
+void addToOpenList(const Node& node, std::priority_queue<CostNodeId, std::vector<CostNodeId>, std::greater<CostNodeId> >& open_list) {
+    open_list.push(make_pair(node.cost + node.heuristic, node.id));
+}
 
 list<GroundedAction> planner(Env* env)
 {
@@ -1012,20 +1015,20 @@ list<GroundedAction> planner(Env* env)
     list<GroundedAction> path;
 
     // // A* search
-    typedef std::pair<int, int> CostNodeId;
     std::priority_queue<CostNodeId, std::vector<CostNodeId>, std::greater<CostNodeId> > open_list;
 
     unordered_map<int, Node> graph;
     unordered_map<int, bool> closed_list;
 
     State start(env->get_initial_conditions());
+    State goal(env->get_goal_conditions());
     // cout << "Start state: ";
     // for (const auto& cond : start.conditions) {
     //     cout << cond;
     // }
     // cout << endl;
 
-    State goal(env->get_goal_conditions());
+
     // for (const auto& action : all_actions) {
     //     auto next_state = start.branch(action);
     //     if (next_state.isValid()) {
@@ -1051,16 +1054,17 @@ list<GroundedAction> planner(Env* env)
 
 
     graph[0] = Node(start, 0, getHeuristic(start, goal), 0);
+    addToOpenList(graph[0], open_list);
     // graph[1] = Node(goal, 0, getHeuristic(start, goal), 0);
-
-
+    int counter = 0;
     while (!open_list.empty()) {
+        cout << counter << endl;
         // get the node with least cost
         auto current_id = open_list.top().second;
         open_list.pop();
         closed_list[current_id] = true;
 
-        const auto& current_node = graph[current_id];
+        auto& current_node = graph[current_id];
         if (current_node.heuristic == 0) {
             cout << "Goal found!" << endl;
             // back trace to find a path
@@ -1070,9 +1074,32 @@ list<GroundedAction> planner(Env* env)
         // branch out from current node
         
         for (const auto& action : all_actions) {
-            auto next_state = start.branch(action);
+            auto next_state = current_node.state.branch(action);
             if (next_state.isValid()) {
-                
+                counter++;
+                // state, cost, heuristic, id
+                int id = graph.size();
+                Node new_node(next_state, current_node.cost + 1, getHeuristic(next_state, goal), id);
+                graph[id] = new_node;
+                addToOpenList(new_node, open_list);
+
+                // cout << "From state: ";
+                // for (const auto& cond : start.conditions) {
+                //     cout << cond;
+                // }
+                // cout << endl;
+
+                // cout << "Applied action: " << action << endl;
+                // cout << "With effects: ";
+                // for (const auto& eff : action.getEffects()) {
+                //     cout << eff;
+                // }
+                // cout << endl;
+                // cout << "To state: ";
+                // for (const auto& cond : next_state.conditions) {
+                //     cout << cond;
+                // }
+                // cout << endl;
             }
         }
 
@@ -1104,7 +1131,7 @@ list<GroundedAction> planner(Env* env)
 int main(int argc, char* argv[])
 {
     // DO NOT CHANGE THIS FUNCTION
-    char* filename = (char*)("example.txt");
+    char* filename = (char*)("p1.txt");
     if (argc > 1)
         filename = argv[1];
 
