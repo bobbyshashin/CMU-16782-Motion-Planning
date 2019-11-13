@@ -353,6 +353,16 @@ public:
             this->arg_values.push_back(ar);
         }
     }
+    GroundedAction(const GroundedAction& ga)
+    {
+        this->name = ga.name;
+        for (string ar : ga.arg_values)
+        {
+            this->arg_values.push_back(ar);
+        }
+        this->gPreconditions = ga.gPreconditions;
+        this->gEffects = ga.gEffects;
+    }
 
     string get_name() const
     {
@@ -964,10 +974,37 @@ public:
 
     }
 
+    bool operator==(const State& rhs) const {
+        if (this->valid != rhs.valid || this->conditions.size() != rhs.conditions.size())
+            return false;
+
+        return this->conditions == rhs.conditions;
+    }
+    string toString() const {
+        string temp = "";
+        for (const auto& cond : this->conditions) {
+            temp += cond.toString();
+        }
+        return temp;
+    }
+
     // Members
     unordered_set<GroundedCondition, GroundedConditionHasher, GroundedConditionComparator> conditions;
     bool valid;
 
+};
+
+struct StateComparator {
+    bool operator()(const State& lhs, const State& rhs) const {
+        return lhs == rhs;
+    }
+};
+
+struct StateHasher
+{
+    size_t operator()(const State& s) const {
+        return hash<string>{}(s.toString());
+    }
 };
 
 int getHeuristic(const State& s, const State& goal) {
@@ -1005,6 +1042,38 @@ void addToOpenList(const Node& node, std::priority_queue<CostNodeId, std::vector
     open_list.push(make_pair(node.cost + node.heuristic, node.id));
 }
 
+int isVisited(const State& state, const vector<State>& visited_states) {
+    for (int i=0; i<visited_states.size(); ++i) {
+        if (visited_states[i] == state) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+vector<int> findPath(int id, const unordered_map<int, int>& parent) {
+    vector<int> path;
+    int curr_id = id;
+    path.push_back(id);
+    while (true) {
+        curr_id = parent.at(curr_id);
+        if (curr_id == 0) {
+            break;
+        }
+        path.push_back(curr_id);
+    }
+    return path;
+}
+
+void printPath(const vector<int>& path, const unordered_map<int, GroundedAction>& actions) {
+    cout << "Printing path..." << endl;
+    for (int i=path.size()-1; i>=0; --i) {
+        // cout << id << endl;
+        cout << actions.at(path[i]) << endl;
+    }
+
+}
+
 list<GroundedAction> planner(Env* env)
 {
     auto t_start = clock();
@@ -1018,6 +1087,9 @@ list<GroundedAction> planner(Env* env)
     std::priority_queue<CostNodeId, std::vector<CostNodeId>, std::greater<CostNodeId> > open_list;
 
     unordered_map<int, Node> graph;
+    unordered_map<int, GroundedAction> id_to_actions;
+    unordered_map<int, int> parent;
+    vector<State> visited_states;
     unordered_map<int, bool> closed_list;
 
     State start(env->get_initial_conditions());
@@ -1028,46 +1100,34 @@ list<GroundedAction> planner(Env* env)
     // }
     // cout << endl;
 
-
-    // for (const auto& action : all_actions) {
-    //     auto next_state = start.branch(action);
-    //     if (next_state.isValid()) {
-    //         cout << "From state: ";
-    //         for (const auto& cond : start.conditions) {
-    //             cout << cond;
-    //         }
-    //         cout << endl;
-
-    //         cout << "Applied action: " << action << endl;
-    //         cout << "With effects: ";
-    //         for (const auto& eff : action.getEffects()) {
-    //             cout << eff;
-    //         }
-    //         cout << endl;
-    //         cout << "To state: ";
-    //         for (const auto& cond : next_state.conditions) {
-    //             cout << cond;
-    //         }
-    //         cout << endl;
-    //     }
-    // }
-
-
     graph[0] = Node(start, 0, getHeuristic(start, goal), 0);
+    parent[0] = -1;
     addToOpenList(graph[0], open_list);
+    visited_states.push_back(start);
     // graph[1] = Node(goal, 0, getHeuristic(start, goal), 0);
     int counter = 0;
     while (!open_list.empty()) {
-        cout << counter << endl;
+        //         for (const auto& pa : parent) {
+        //     cout << pa.first << " to " << pa.second << endl;
+        // }
+        // if (counter % 1000 == 0) {
+            cout << "Expanded " << counter << " states" << endl;
+        // }
+
         // get the node with least cost
         auto current_id = open_list.top().second;
         open_list.pop();
+        if (closed_list[current_id] == true)
+            continue;
         closed_list[current_id] = true;
 
         auto& current_node = graph[current_id];
         if (current_node.heuristic == 0) {
             cout << "Goal found!" << endl;
             // back trace to find a path
+            const auto& path = findPath(current_id, parent);
+
+            printPath(path, id_to_actions);
             break; // or return path (actions)
         }
 
@@ -1076,32 +1136,63 @@ list<GroundedAction> planner(Env* env)
         for (const auto& action : all_actions) {
             auto next_state = current_node.state.branch(action);
             if (next_state.isValid()) {
-                counter++;
+
+                int visited = isVisited(next_state, visited_states);
+                if (visited == -1) {
+                    counter++;
+
+                    // not visited, new state
+                    visited_states.push_back(next_state);
+                    int id = graph.size();
+                    Node new_node(next_state, current_node.cost + 1, getHeuristic(next_state, goal), id);
+                    graph[id] = new_node;
+                    id_to_actions.insert({id, action});
+                    parent[id] = current_id;
+                    addToOpenList(new_node, open_list);
+                } else {
+                    // visited
+                    if (closed_list[visited] == false) {
+                        // not closed yet
+                        if (graph[visited].cost > current_node.cost + 1) {
+                            // this path has a lower cost
+                            graph[visited].cost = current_node.cost + 1;
+                            parent[visited] = current_id; 
+                            addToOpenList(graph[visited], open_list);
+                            id_to_actions.at(visited) = action;
+
+                        }
+                    }
+                }
+                
                 // state, cost, heuristic, id
-                int id = graph.size();
-                Node new_node(next_state, current_node.cost + 1, getHeuristic(next_state, goal), id);
-                graph[id] = new_node;
-                addToOpenList(new_node, open_list);
 
-                // cout << "From state: ";
-                // for (const auto& cond : start.conditions) {
-                //     cout << cond;
-                // }
-                // cout << endl;
 
-                // cout << "Applied action: " << action << endl;
-                // cout << "With effects: ";
-                // for (const auto& eff : action.getEffects()) {
-                //     cout << eff;
-                // }
-                // cout << endl;
-                // cout << "To state: ";
-                // for (const auto& cond : next_state.conditions) {
-                //     cout << cond;
-                // }
-                // cout << endl;
+                cout << "From state: ";
+                for (const auto& cond : current_node.state.conditions) {
+                    cout << cond;
+                }
+                cout << endl;
+
+                cout << "Applied action: " << action << endl;
+                cout << "With effects: ";
+                for (const auto& eff : action.getEffects()) {
+                    cout << eff;
+                }
+                cout << endl;
+                cout << "To state: ";
+                for (const auto& cond : next_state.conditions) {
+                    cout << cond;
+                }
+                cout << endl << endl;
             }
         }
+
+        // for (const auto& ac : id_to_actions) {
+        //     cout << ac.second << endl;
+        // }
+        // for (const auto& pa : parent) {
+        //     cout << pa.first << " to " << pa.second << endl;
+        // }
 
         // loop through all possible actions
         // const auto& new_state = current_node.state.branch(grounded_action)
@@ -1131,7 +1222,7 @@ list<GroundedAction> planner(Env* env)
 int main(int argc, char* argv[])
 {
     // DO NOT CHANGE THIS FUNCTION
-    char* filename = (char*)("p1.txt");
+    char* filename = (char*)("example.txt");
     if (argc > 1)
         filename = argv[1];
 

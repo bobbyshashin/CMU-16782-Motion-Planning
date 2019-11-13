@@ -1,0 +1,40 @@
+Symbols: A,B,C,D,E,F,W,Q,M
+Initial conditions: At(Q,B), At(M,A), Quadcopter(Q), Mobile(M), Flying(Q), EmptyTank(Q), LowBattery(Q), Location(A), Location(B), Location(C), Location(D), Location(E), Location(F), Location(W), Location(F), Fire(F), ThreeLeft(F), Water(W)
+Goal conditions: Extinguished(F)
+
+Actions:
+        MoveMobile(m,a,b)
+        Preconditions: At(m,a), Mobile(m), Location(a), Location(b)
+        Effects: At(m,b), !At(m,a)
+
+        MoveTogether(a,b)
+        Preconditions: At(M,a), At(Q,a), Mobile(M), Quadcopter(Q), NotFlying(Q), Location(a), Location(b)
+        Effects: At(M,b), !At(M,a), At(Q,b), !At(Q,a)
+
+        FillTank(q)
+        Preconditions: At(Q, W), NotFlying(Q), Water(W), EmptyTank(Q)
+        Effects: !EmptyTank(Q), FilledTank(Q)
+
+        LandOnMobile(x)
+        Preconditions: Location(x), At(Q, x), At(M, x), Flying(Q)
+        Effects: !Flying(Q), NotFlying(Q)
+
+        Takeoff(x)
+        Preconditions: Location(x), At(Q, x), At(M, x), NotFlying(Q), ChargedBattery(Q),
+        Effects: Flying(Q), LowBattery(Q), !NotFlying(Q), !ChargedBattery(Q)
+
+        Charge(q)
+        Preconditions: NotFlying(Q), LowBattery(Q)
+        Effects: !LowBattery(Q), ChargedBattery(Q)
+
+        FirstPour(q)
+        Preconditions: Flying(Q), Fire(F), At(Q, F), FilledTank(Q), ThreeLeft(F)
+        Effects: !ThreeLeft(F), TwoLeft(F), EmptyTank(Q), !FilledTank(Q)
+
+        SecondPour(q)
+        Preconditions: Flying(Q), Fire(F), At(Q, F), FilledTank(Q), TwoLeft(F)
+        Effects: !TwoLeft(F), OneLeft(F), EmptyTank(Q), !FilledTank(Q)
+
+        ThirdPour(q)
+        Preconditions: Flying(Q), Fire(F), At(Q, F), FilledTank(Q), OneLeft(F)
+        Effects: !OneLeft(F), Extinguished(F), EmptyTank(Q), !FilledTank(Q)
